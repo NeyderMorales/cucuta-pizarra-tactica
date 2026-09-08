@@ -1,0 +1,148 @@
+import type { Formacion, Posicion, ZonaFormacion } from '../types';
+
+function zona(posicion: Posicion, x: number, y: number, indice: number): ZonaFormacion {
+  return { id: `${posicion}-${indice}`, posicion, x, y };
+}
+
+export const FORMACIONES: Formacion[] = [
+  {
+    id: '4-3-3',
+    nombre: '4-3-3',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('LI', 16, 24, 1),
+      zona('DFC', 38, 20, 2),
+      zona('DFC', 62, 20, 3),
+      zona('LD', 84, 24, 4),
+      zona('MCD', 50, 42, 5),
+      zona('MC', 30, 52, 6),
+      zona('MC', 70, 52, 7),
+      zona('EI', 16, 76, 8),
+      zona('DC', 50, 84, 9),
+      zona('ED', 84, 76, 10),
+    ],
+  },
+  {
+    id: '4-4-2',
+    nombre: '4-4-2',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('LI', 16, 22, 1),
+      zona('DFC', 38, 18, 2),
+      zona('DFC', 62, 18, 3),
+      zona('LD', 84, 22, 4),
+      zona('MI', 14, 48, 5),
+      zona('MC', 38, 46, 6),
+      zona('MC', 62, 46, 7),
+      zona('MD', 86, 48, 8),
+      zona('DC', 38, 80, 9),
+      zona('DC', 62, 80, 10),
+    ],
+  },
+  {
+    id: '4-2-3-1',
+    nombre: '4-2-3-1',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('LI', 16, 22, 1),
+      zona('DFC', 38, 18, 2),
+      zona('DFC', 62, 18, 3),
+      zona('LD', 84, 22, 4),
+      zona('MCD', 35, 40, 5),
+      zona('MCD', 65, 40, 6),
+      zona('EI', 18, 66, 7),
+      zona('MCO', 50, 60, 8),
+      zona('ED', 82, 66, 9),
+      zona('DC', 50, 84, 10),
+    ],
+  },
+  {
+    id: '4-2-4',
+    nombre: '4-2-4',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('LI', 16, 22, 1),
+      zona('DFC', 38, 18, 2),
+      zona('DFC', 62, 18, 3),
+      zona('LD', 84, 22, 4),
+      zona('MC', 35, 46, 5),
+      zona('MC', 65, 46, 6),
+      zona('EI', 16, 74, 7),
+      zona('DC', 38, 84, 8),
+      zona('DC', 62, 84, 9),
+      zona('ED', 84, 74, 10),
+    ],
+  },
+  {
+    id: '3-5-2',
+    nombre: '3-5-2',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('DFC', 30, 20, 1),
+      zona('DFC', 50, 16, 2),
+      zona('DFC', 70, 20, 3),
+      zona('LI', 10, 42, 4),
+      zona('MC', 35, 48, 5),
+      zona('MC', 50, 44, 6),
+      zona('MC', 65, 48, 7),
+      zona('LD', 90, 42, 8),
+      zona('DC', 38, 82, 9),
+      zona('DC', 62, 82, 10),
+    ],
+  },
+  {
+    id: '5-3-2',
+    nombre: '5-3-2',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('LI', 10, 24, 1),
+      zona('DFC', 30, 18, 2),
+      zona('DFC', 50, 14, 3),
+      zona('DFC', 70, 18, 4),
+      zona('LD', 90, 24, 5),
+      zona('MC', 30, 50, 6),
+      zona('MC', 50, 46, 7),
+      zona('MC', 70, 50, 8),
+      zona('DC', 38, 82, 9),
+      zona('DC', 62, 82, 10),
+    ],
+  },
+  {
+    id: '4-1-4-1',
+    nombre: '4-1-4-1',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('LI', 16, 22, 1),
+      zona('DFC', 38, 18, 2),
+      zona('DFC', 62, 18, 3),
+      zona('LD', 84, 22, 4),
+      zona('MCD', 50, 38, 5),
+      zona('MI', 14, 58, 6),
+      zona('MC', 38, 54, 7),
+      zona('MC', 62, 54, 8),
+      zona('MD', 86, 58, 9),
+      zona('DC', 50, 84, 10),
+    ],
+  },
+  {
+    id: '3-4-3',
+    nombre: '3-4-3',
+    zonas: [
+      zona('POR', 50, 6, 0),
+      zona('DFC', 30, 20, 1),
+      zona('DFC', 50, 16, 2),
+      zona('DFC', 70, 20, 3),
+      zona('MI', 14, 48, 4),
+      zona('MC', 38, 46, 5),
+      zona('MC', 62, 46, 6),
+      zona('MD', 86, 48, 7),
+      zona('EI', 16, 76, 8),
+      zona('DC', 50, 82, 9),
+      zona('ED', 84, 76, 10),
+    ],
+  },
+];
+
+export function obtenerFormacion(id: string): Formacion | undefined {
+  return FORMACIONES.find((f) => f.id === id);
+}

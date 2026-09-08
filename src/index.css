@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100dvh;
+  overflow: hidden;
+  background-color: #0b0b0c;
+}
+
+body {
+  margin: 0;
+  font-family: 'Archivo', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.superficie-vidrio {
+  background-color: rgba(17, 17, 17, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.sin-seleccion {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.barra-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.barra-scroll::-webkit-scrollbar-thumb {
+  background-color: #3a3a3f;
+  border-radius: 999px;
+}
+.barra-scroll::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+@keyframes entrada-zona {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes entrada-tarjeta {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animar-entrada-zona {
+  animation: entrada-zona 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animar-entrada-tarjeta {
+  animation: entrada-tarjeta 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes salida-objeto {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+.animar-salida-objeto {
+  animation: salida-objeto 300ms cubic-bezier(0.4, 0, 1, 1) both;
+}
