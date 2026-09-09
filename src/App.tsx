@@ -409,6 +409,9 @@ export default function App() {
   const toggleModoDibujo = usePizarraStore((s) => s.toggleModoDibujo);
 
   const cargarFotos = usePlantillaStore((s) => s.cargarFotos);
+  const cargarDatosEditados = usePlantillaStore((s) => s.cargarDatosEditados);
+  const sincronizarPersonalizados = usePlantillaStore((s) => s.sincronizarPersonalizados);
+  const jugadoresPersonalizados = useAlineacionStore((s) => s.historial.presente.jugadoresPersonalizados);
 
   const modoObjetoActivo = usePizarraCampoStore((s) => s.modoObjetoActivo);
   const activarModoObjeto = usePizarraCampoStore((s) => s.activarModoObjeto);
@@ -463,7 +466,16 @@ export default function App() {
     inicializadoRef.current = true;
     void inicializar();
     void cargarFotos();
-  }, [inicializar, cargarFotos]);
+    void cargarDatosEditados();
+  }, [inicializar, cargarFotos, cargarDatosEditados]);
+
+  // Punto único donde la plantilla en memoria recoge los jugadores personalizados
+  // del tablero abierto. Al ser reactivo cubre de una sola vez cargar una alineación,
+  // importar un JSON, crear uno nuevo y deshacer/rehacer esa creación, sin que ninguna
+  // vista tenga que cambiar cómo busca un jugador por id.
+  useEffect(() => {
+    sincronizarPersonalizados(jugadoresPersonalizados);
+  }, [jugadoresPersonalizados, sincronizarPersonalizados]);
 
   if (cargando) return <PantallaCarga />;
 

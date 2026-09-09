@@ -37,6 +37,7 @@ describe('flujo: formación → asignación → arrastre → guardado → recarg
           rival: null,
           marcajes: [],
           cancha: canchaVacia(),
+          jugadoresPersonalizados: [],
         },
         etiquetaPresente: 'Alineación inicial',
         futuro: [],

@@ -2,8 +2,10 @@ import { useRef, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Boton } from '../ui/Boton';
 import { usePlantillaStore } from '../../store/plantillaStore';
+import { useAlineacionStore } from '../../store/alineacionStore';
 import { useUiStore } from '../../store/uiStore';
 import { recortarImagenCircularABase64 } from '../../utils/imagen';
+import { ModalJugadorPersonalizado } from './ModalJugadorPersonalizado';
 import type { Jugador } from '../../types';
 
 interface ModalGestionPlantillaProps {
@@ -19,10 +21,16 @@ export function ModalGestionPlantilla({ abierto, onCerrar }: ModalGestionPlantil
   const jugadores = usePlantillaStore((s) => s.jugadores);
   const establecerFoto = usePlantillaStore((s) => s.establecerFoto);
   const quitarFoto = usePlantillaStore((s) => s.quitarFoto);
+  const actualizarJugador = usePlantillaStore((s) => s.actualizarJugador);
+  const personalizados = useAlineacionStore((s) => s.historial.presente.jugadoresPersonalizados);
+  const actualizarJugadorPersonalizado = useAlineacionStore((s) => s.actualizarJugadorPersonalizado);
   const mostrarToast = useUiStore((s) => s.mostrarToast);
 
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  const jugadorEditado = editandoId ? (jugadores.find((j) => j.id === editandoId) ?? null) : null;
 
   async function manejarArchivo(jugadorId: string, archivo: File | undefined): Promise<void> {
     if (!archivo) return;
@@ -65,10 +73,18 @@ export function ModalGestionPlantilla({ abierto, onCerrar }: ModalGestionPlantil
               <p className="truncate font-display text-sm font-semibold uppercase tracking-wide text-white">
                 {jugador.dorsal} · {jugador.nombre} {jugador.apellido}
               </p>
-              <p className="text-xs text-club-plata/60">{jugador.posicionNatural}</p>
+              <p className="text-xs text-club-plata/60">
+                {jugador.posicionNatural}
+                {jugador.posicionesSecundarias.length > 0 && (
+                  <span className="text-club-plata/40"> · sec. {jugador.posicionesSecundarias.join('/')}</span>
+                )}
+              </p>
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5">
+              <Boton tamano="sm" variante="secundario" onClick={() => setEditandoId(jugador.id)}>
+                Editar
+              </Boton>
               <input
                 ref={(nodo) => {
                   inputRefs.current[jugador.id] = nodo;
@@ -98,6 +114,20 @@ export function ModalGestionPlantilla({ abierto, onCerrar }: ModalGestionPlantil
           </li>
         ))}
       </ul>
+
+      <ModalJugadorPersonalizado
+        abierto={jugadorEditado !== null}
+        posicionSugerida={null}
+        jugadorAEditar={jugadorEditado}
+        onCerrar={() => setEditandoId(null)}
+        onCrear={() => {}}
+        onEditar={(jugadorId, datos) => {
+          // Un personalizado vive en el documento (y su edición es deshacible);
+          // uno de plantilla se guarda aparte, para que quede cambiado en todos los tableros.
+          if (personalizados.some((j) => j.id === jugadorId)) actualizarJugadorPersonalizado(jugadorId, datos);
+          else void actualizarJugador(jugadorId, datos);
+        }}
+      />
     </Modal>
   );
 }

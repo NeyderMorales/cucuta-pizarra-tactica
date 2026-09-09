@@ -5,6 +5,7 @@ import type {
   ColorObjeto,
   EstadoGuardado,
   EstrategiaCambioFormacion,
+  Jugador,
   JugadorEnCampo,
   JugadorRival,
   ObjetoCampo,
@@ -43,6 +44,13 @@ export interface DocumentoTactico {
   rival: EquipoRival | null;
   marcajes: Marcaje[];
   cancha: IdentidadCancha;
+  /**
+   * Jugadores creados a mano desde el selector, que no están en la plantilla del
+   * club. Viven en el documento (como los del rival) para que viajen con la
+   * alineación al guardarla o exportarla: si estuvieran solo en la plantilla, un
+   * JSON abierto en otro dispositivo dejaría su hueco vacío en el campo.
+   */
+  jugadoresPersonalizados: Jugador[];
 }
 
 function balonInicial(): Balon {
@@ -62,6 +70,7 @@ function documentoVacio(formacionId: string): DocumentoTactico {
     rival: null,
     marcajes: [],
     cancha: canchaVacia(),
+    jugadoresPersonalizados: [],
   };
 }
 
@@ -80,6 +89,7 @@ function documentoDesdeAlineacion(alineacion: Alineacion): DocumentoTactico {
     rival: alineacion.rival ?? null,
     marcajes: alineacion.marcajes ?? [],
     cancha: alineacion.cancha ?? canchaVacia(),
+    jugadoresPersonalizados: alineacion.jugadoresPersonalizados ?? [],
   };
 }
 
@@ -139,6 +149,7 @@ export function alineacionDesdeDocumento(
     rival: doc.rival,
     marcajes: doc.marcajes,
     cancha: doc.cancha,
+    jugadoresPersonalizados: doc.jugadoresPersonalizados,
     creadaEn: base.creadaEn,
     modificadaEn,
   };
@@ -183,6 +194,8 @@ interface AlineacionState {
   reemplazarDocumentoCompleto: (alineacion: Alineacion) => void;
 
   seleccionarFormacion: (formacionId: string, estrategia: EstrategiaCambioFormacion) => void;
+  agregarJugadorPersonalizado: (jugador: Jugador) => void;
+  actualizarJugadorPersonalizado: (jugadorId: string, datos: Partial<Jugador>) => void;
   asignarJugador: (zonaId: string, x: number, y: number, jugadorId: string) => void;
   moverJugador: (jugadorId: string, x: number, y: number) => void;
   intercambiarPosiciones: (jugadorIdA: string, jugadorIdB: string) => void;
@@ -407,6 +420,26 @@ export const useAlineacionStore = create<AlineacionState>((set, get) => {
         // cada uno en la mitad que le toca según el modo de vista activo (FA4).
         recolocarPorModo(doc);
       }, etiqueta);
+    },
+
+    // Se registra en el documento antes de asignarlo a una zona o al banquillo, para
+    // que se guarde y se exporte con la alineación. La plantilla en memoria se
+    // sincroniza aparte (ver `sincronizarPersonalizados`), así ninguna vista tiene
+    // que cambiar cómo busca un jugador por id.
+    agregarJugadorPersonalizado: (jugador) => {
+      mutar((doc) => {
+        doc.jugadoresPersonalizados.push(jugador);
+      }, `${jugador.apellido.toUpperCase() || `#${jugador.dorsal}`} creado`);
+    },
+
+    // Los personalizados viven en el documento, así que editarlos es un paso del
+    // historial y viaja con la alineación; los de plantilla se editan aparte,
+    // en `plantillaStore`, porque deben quedar cambiados en todos los tableros.
+    actualizarJugadorPersonalizado: (jugadorId, datos) => {
+      mutar((doc) => {
+        const jugador = doc.jugadoresPersonalizados.find((j) => j.id === jugadorId);
+        if (jugador) Object.assign(jugador, datos);
+      }, `${(datos.apellido ?? '').toUpperCase() || 'Jugador'} actualizado`);
     },
 
     // Nota: la zona conceptual queda "consumida" en zonaOrigenId aunque el jugador

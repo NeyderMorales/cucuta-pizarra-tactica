@@ -44,6 +44,7 @@ import { ZonaRival } from './ZonaRival';
 import { DraggableJugador } from '../jugador/DraggableJugador';
 import { MenuJugador } from '../jugador/MenuJugador';
 import { SelectorJugador } from '../jugador/SelectorJugador';
+import { ModalJugadorPersonalizado } from '../jugador/ModalJugadorPersonalizado';
 import { ModalNotaJugador } from '../jugador/ModalNotaJugador';
 import { CapaDibujo } from '../pizarra/CapaDibujo';
 import { DrawerPlantilla } from '../ui/DrawerPlantilla';
@@ -234,6 +235,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
 
   const documento = useAlineacionStore((s) => s.historial.presente);
   const asignarJugador = useAlineacionStore((s) => s.asignarJugador);
+  const agregarJugadorPersonalizado = useAlineacionStore((s) => s.agregarJugadorPersonalizado);
   const moverJugador = useAlineacionStore((s) => s.moverJugador);
   const moverDesdeBanquilloACampo = useAlineacionStore((s) => s.moverDesdeBanquilloACampo);
   const intercambiarPosiciones = useAlineacionStore((s) => s.intercambiarPosiciones);
@@ -265,7 +267,11 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
   const agregarMarcaje = useAlineacionStore((s) => s.agregarMarcaje);
   const eliminarMarcaje = useAlineacionStore((s) => s.eliminarMarcaje);
 
-  const obtenerPorId = usePlantillaStore((s) => s.obtenerPorId);
+  // Se suscribe a la lista, no a `obtenerPorId`: esa función tiene identidad estable
+  // y Zustand no re-renderizaría al añadirse un jugador personalizado, así que su
+  // ficha no aparecería hasta que otra cosa provocara un render.
+  const jugadoresPlantilla = usePlantillaStore((s) => s.jugadores);
+  const obtenerPorId = (id: string) => jugadoresPlantilla.find((j) => j.id === id);
   const modoDibujoActivo = usePizarraStore((s) => s.modoDibujoActivo);
   const mostrarToast = useUiStore((s) => s.mostrarToast);
 
@@ -326,6 +332,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
   );
 
   const [zonaActiva, setZonaActiva] = useState<ZonaFormacion | null>(null);
+  const [zonaParaPersonalizado, setZonaParaPersonalizado] = useState<ZonaFormacion | null>(null);
   const [menu, setMenu] = useState<{ jugadorId: string; x: number; y: number } | null>(null);
   const [cambioParaId, setCambioParaId] = useState<string | null>(null);
   const [notaParaId, setNotaParaId] = useState<string | null>(null);
@@ -766,6 +773,19 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
             onCerrar={() => setZonaActiva(null)}
             onSeleccionarJugador={(jugadorId) => {
               if (zonaActiva) asignarJugador(zonaActiva.id, zonaActiva.x, zonaActiva.y, jugadorId);
+            }}
+            onCrearPersonalizado={() => setZonaParaPersonalizado(zonaActiva)}
+          />
+
+          <ModalJugadorPersonalizado
+            abierto={zonaParaPersonalizado !== null}
+            posicionSugerida={zonaParaPersonalizado?.posicion ?? null}
+            onCerrar={() => setZonaParaPersonalizado(null)}
+            onCrear={(jugador) => {
+              agregarJugadorPersonalizado(jugador);
+              if (zonaParaPersonalizado) {
+                asignarJugador(zonaParaPersonalizado.id, zonaParaPersonalizado.x, zonaParaPersonalizado.y, jugador.id);
+              }
             }}
           />
 

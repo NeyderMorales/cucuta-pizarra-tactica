@@ -174,6 +174,8 @@ export interface Alineacion {
   rival: EquipoRival | null;
   marcajes: Marcaje[];
   cancha: IdentidadCancha;
+  /** Jugadores creados a mano que no están en la plantilla; viajan con la alineación. */
+  jugadoresPersonalizados?: Jugador[];
 }
 
 export type Orientacion = 'vertical' | 'horizontal';

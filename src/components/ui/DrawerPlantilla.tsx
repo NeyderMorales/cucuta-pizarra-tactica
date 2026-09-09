@@ -6,6 +6,7 @@ import { useAlineacionStore } from '../../store/alineacionStore';
 import { usePlantillaStore } from '../../store/plantillaStore';
 import { DraggableJugador } from '../jugador/DraggableJugador';
 import { SelectorJugador } from '../jugador/SelectorJugador';
+import { ModalJugadorPersonalizado } from '../jugador/ModalJugadorPersonalizado';
 import { Boton } from './Boton';
 import { CAPACIDAD_BANQUILLO } from '../../utils/constantes';
 
@@ -18,9 +19,14 @@ export function DrawerPlantilla() {
   const banquillo = useAlineacionStore((s) => s.historial.presente.banquillo);
   const enviarABanquillo = useAlineacionStore((s) => s.enviarABanquillo);
   const quitarDeBanquillo = useAlineacionStore((s) => s.quitarDeBanquillo);
-  const obtenerPorId = usePlantillaStore((s) => s.obtenerPorId);
+  const agregarJugadorPersonalizado = useAlineacionStore((s) => s.agregarJugadorPersonalizado);
+  // Igual que en Campo: suscribirse a la lista, no a `obtenerPorId` (identidad estable),
+  // para que un jugador personalizado recién creado aparezca ya en el banquillo.
+  const jugadoresPlantilla = usePlantillaStore((s) => s.jugadores);
+  const obtenerPorId = (id: string) => jugadoresPlantilla.find((j) => j.id === id);
 
   const [selectorAbierto, setSelectorAbierto] = useState(false);
+  const [personalizadoAbierto, setPersonalizadoAbierto] = useState(false);
   const { setNodeRef: setDroppableBanquillo, isOver: sobreBanquillo } = useDroppable({ id: 'banquillo' });
 
   const conteoTitulares = titulares.length;
@@ -112,6 +118,17 @@ export function DrawerPlantilla() {
         posicionSugerida={null}
         titulo="Añadir al banquillo"
         onSeleccionarJugador={(jugadorId) => enviarABanquillo(jugadorId)}
+        onCrearPersonalizado={() => setPersonalizadoAbierto(true)}
+      />
+
+      <ModalJugadorPersonalizado
+        abierto={personalizadoAbierto}
+        posicionSugerida={null}
+        onCerrar={() => setPersonalizadoAbierto(false)}
+        onCrear={(jugador) => {
+          agregarJugadorPersonalizado(jugador);
+          enviarABanquillo(jugador.id);
+        }}
       />
     </>
   );

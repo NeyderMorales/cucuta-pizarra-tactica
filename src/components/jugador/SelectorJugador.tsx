@@ -11,6 +11,8 @@ interface SelectorJugadorProps {
   posicionSugerida: Posicion | null;
   titulo?: string;
   onSeleccionarJugador: (jugadorId: string) => void;
+  /** Si se pasa, aparece el atajo para crear un jugador que no está en la plantilla. */
+  onCrearPersonalizado?: () => void;
 }
 
 function coincideFiltro(jugador: Jugador, filtro: Posicion | null): 0 | 1 | 2 {
@@ -20,7 +22,14 @@ function coincideFiltro(jugador: Jugador, filtro: Posicion | null): 0 | 1 | 2 {
   return 2;
 }
 
-export function SelectorJugador({ abierto, onCerrar, posicionSugerida, titulo, onSeleccionarJugador }: SelectorJugadorProps) {
+export function SelectorJugador({
+  abierto,
+  onCerrar,
+  posicionSugerida,
+  titulo,
+  onSeleccionarJugador,
+  onCrearPersonalizado,
+}: SelectorJugadorProps) {
   const jugadores = usePlantillaStore((s) => s.jugadores);
   const titulares = useAlineacionStore((s) => s.historial.presente.titulares);
   const banquillo = useAlineacionStore((s) => s.historial.presente.banquillo);
@@ -105,6 +114,29 @@ export function SelectorJugador({ abierto, onCerrar, posicionSugerida, titulo, o
           <input type="checkbox" checked={verTodos} onChange={(e) => setVerTodos(e.target.checked)} className="h-4 w-4 accent-club-rojo" />
           Ver toda la plantilla
         </label>
+
+        {onCrearPersonalizado && (
+          <button
+            type="button"
+            onClick={() => {
+              manejarCierre();
+              onCrearPersonalizado();
+            }}
+            className="flex min-h-[44px] w-full items-center gap-3 rounded-lg border border-dashed border-white/20 px-3 py-2 text-left transition-colors duration-rapido hover:border-club-rojo/60 hover:bg-white/5"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 font-display text-base font-bold text-club-rojo ring-1 ring-white/10">
+              ＋
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="font-display text-sm font-semibold uppercase tracking-wide text-white">
+                Jugador personalizado
+              </span>
+              <span className="text-xs text-club-plata/70">
+                {posicionSugerida ? `Crear uno nuevo para ${posicionSugerida}` : 'Crear uno que no está en la plantilla'}
+              </span>
+            </span>
+          </button>
+        )}
 
         <ul className="barra-scroll -mx-1 flex max-h-[50vh] flex-col gap-1 overflow-y-auto px-1">
           {visibles.length === 0 && <li className="py-6 text-center text-sm text-club-plata/60">Sin resultados.</li>}
