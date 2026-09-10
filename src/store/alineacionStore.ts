@@ -28,9 +28,18 @@ import {
 import { generarId } from '../utils/id';
 import { CAPACIDAD_BANQUILLO, DEBOUNCE_AUTOGUARDADO_MS, ETIQUETAS_OBJETO, LIMITE_BALONES, LIMITE_OBJETOS } from '../utils/constantes';
 import { canchaVacia, claveCelda, cuadriculaVacia, recortarAMitad, siguienteColorCelda, ubicarZonaEnLado } from '../utils/anexoA';
+import { posicionEfectivaBalon } from '../utils/balon';
 import { useUiStore } from './uiStore';
 import { usePlantillaStore } from './plantillaStore';
-import type { CuadriculaCampo, EquipoRival, IdentidadCancha, Marcaje, Posicion } from '../types';
+import type {
+  CuadriculaCampo,
+  EquipoRival,
+  FrameTactico,
+  IdentidadCancha,
+  Marcaje,
+  Posicion,
+  SecuenciaTactica,
+} from '../types';
 
 export interface DocumentoTactico {
   formacionId: string;
@@ -51,6 +60,11 @@ export interface DocumentoTactico {
    * JSON abierto en otro dispositivo dejaría su hueco vacío en el campo.
    */
   jugadoresPersonalizados: Jugador[];
+  /**
+   * Jugada animada. `null` mientras el tablero sea una pizarra fija: así todo lo
+   * anterior sigue comportándose igual hasta que el entrenador crea una jugada.
+   */
+  secuencia: SecuenciaTactica | null;
 }
 
 function balonInicial(): Balon {
@@ -71,7 +85,51 @@ function documentoVacio(formacionId: string): DocumentoTactico {
     marcajes: [],
     cancha: canchaVacia(),
     jugadoresPersonalizados: [],
+    secuencia: null,
   };
+}
+
+/** Toma del documento vivo lo que se anima en una jugada. */
+function frameDesdeDocumento(doc: DocumentoTactico, id: string, nombre?: string): FrameTactico {
+  return {
+    id,
+    nombre,
+    titulares: doc.titulares,
+    jugadoresRival: doc.rival?.jugadores ?? [],
+    balones: doc.balones,
+    objetos: doc.objetos,
+    trazos: doc.trazos,
+    celdasPintadas: doc.cuadricula.celdasPintadas,
+  };
+}
+
+/** Vuelca un frame sobre el documento vivo, dejando intacto todo lo que no se anima. */
+function aplicarFrameADocumento(doc: DocumentoTactico, frame: FrameTactico): void {
+  doc.titulares = frame.titulares;
+  doc.balones = frame.balones;
+  doc.objetos = frame.objetos;
+  doc.trazos = frame.trazos;
+  doc.cuadricula.celdasPintadas = frame.celdasPintadas;
+  if (doc.rival) doc.rival.jugadores = frame.jugadoresRival;
+}
+
+/**
+ * Captura automática (decisión de diseño): antes de movernos a otro frame se
+ * vuelca lo que hay en pantalla al frame activo, para que nadie pierda cambios
+ * por no haber pulsado un botón de guardar.
+ */
+function capturarFrameActivo(doc: DocumentoTactico): void {
+  const secuencia = doc.secuencia;
+  if (!secuencia) return;
+  const activo = secuencia.frames[secuencia.indiceActivo];
+  if (!activo) return;
+  const candidato = frameDesdeDocumento(doc, activo.id, activo.nombre);
+  // Solo se escribe si de verdad cambió algo. `frameDesdeDocumento` devuelve
+  // siempre un objeto nuevo, y asignarlo a ciegas haría que Immer marcase el
+  // documento como modificado y el historial se llenase de pasos vacíos cada
+  // vez que se pulsa play o se toca un chip de la timeline.
+  if (JSON.stringify(candidato) === JSON.stringify(activo)) return;
+  secuencia.frames[secuencia.indiceActivo] = candidato;
 }
 
 /** Convierte una `Alineacion` guardada a `DocumentoTactico`, rellenando con valores por
@@ -90,6 +148,7 @@ function documentoDesdeAlineacion(alineacion: Alineacion): DocumentoTactico {
     marcajes: alineacion.marcajes ?? [],
     cancha: alineacion.cancha ?? canchaVacia(),
     jugadoresPersonalizados: alineacion.jugadoresPersonalizados ?? [],
+    secuencia: alineacion.secuencia ?? null,
   };
 }
 
@@ -150,6 +209,7 @@ export function alineacionDesdeDocumento(
     marcajes: doc.marcajes,
     cancha: doc.cancha,
     jugadoresPersonalizados: doc.jugadoresPersonalizados,
+    secuencia: doc.secuencia,
     creadaEn: base.creadaEn,
     modificadaEn,
   };
@@ -247,6 +307,15 @@ interface AlineacionState {
 
   // Anexo A — FA5 identidad de cancha
   actualizarCancha: (cambios: Partial<IdentidadCancha>) => void;
+
+  // Jugadas animadas (secuencia de frames)
+  iniciarSecuencia: () => void;
+  descartarSecuencia: () => void;
+  agregarFrame: () => void;
+  duplicarFrame: (indice: number) => void;
+  eliminarFrame: (indice: number) => void;
+  irAFrame: (indice: number) => void;
+  renombrarFrame: (indice: number, nombre: string) => void;
 
   deshacer: () => void;
   rehacer: () => void;
@@ -658,7 +727,14 @@ export const useAlineacionStore = create<AlineacionState>((set, get) => {
     liberarBalon: (id) =>
       mutar((doc) => {
         const balon = doc.balones.find((b) => b.id === id);
-        if (balon) balon.jugadorPoseedorId = null;
+        if (!balon) return;
+        // Se fija primero dónde estaba a la vista: mientras estuvo anclado su
+        // `x`/`y` no se actualizaron, así que soltarlo sin esto lo devolvía de
+        // golpe a la última posición suelta (normalmente el centro del campo).
+        const punto = posicionEfectivaBalon(balon, doc.titulares);
+        balon.x = punto.x;
+        balon.y = punto.y;
+        balon.jugadorPoseedorId = null;
       }, 'Balón liberado'),
 
     devolverBalonCentro: (id) =>
@@ -768,6 +844,74 @@ export const useAlineacionStore = create<AlineacionState>((set, get) => {
       mutar((doc) => {
         Object.assign(doc.cancha, cambios);
       }, cambios.rotado180 !== undefined ? 'Cancha rotada' : 'Identidad de cancha actualizada'),
+
+    // --- Jugadas animadas ---
+    iniciarSecuencia: () =>
+      mutar((doc) => {
+        if (doc.secuencia) return;
+        doc.secuencia = { frames: [frameDesdeDocumento(doc, generarId(), 'Inicio')], indiceActivo: 0 };
+      }, 'Jugada iniciada'),
+
+    descartarSecuencia: () =>
+      mutar((doc) => {
+        doc.secuencia = null;
+      }, 'Jugada descartada'),
+
+    agregarFrame: () =>
+      mutar((doc) => {
+        const secuencia = doc.secuencia;
+        if (!secuencia) return;
+        // El frame nuevo arranca como copia del estado actual: así el entrenador
+        // mueve solo lo que cambia en ese paso, en vez de recolocarlo todo.
+        capturarFrameActivo(doc);
+        const nuevo = frameDesdeDocumento(doc, generarId());
+        secuencia.frames.splice(secuencia.indiceActivo + 1, 0, nuevo);
+        secuencia.indiceActivo += 1;
+      }, 'Frame añadido'),
+
+    duplicarFrame: (indice) =>
+      mutar((doc) => {
+        const secuencia = doc.secuencia;
+        if (!secuencia) return;
+        capturarFrameActivo(doc);
+        const original = secuencia.frames[indice];
+        if (!original) return;
+        secuencia.frames.splice(indice + 1, 0, { ...original, id: generarId(), nombre: undefined });
+        secuencia.indiceActivo = indice + 1;
+        aplicarFrameADocumento(doc, secuencia.frames[secuencia.indiceActivo]!);
+      }, 'Frame duplicado'),
+
+    eliminarFrame: (indice) =>
+      mutar((doc) => {
+        const secuencia = doc.secuencia;
+        // Una jugada siempre conserva al menos un frame: para quedarse sin
+        // ninguno está `descartarSecuencia`, que es una acción distinta y explícita.
+        if (!secuencia || secuencia.frames.length <= 1 || !secuencia.frames[indice]) return;
+        secuencia.frames.splice(indice, 1);
+        secuencia.indiceActivo = Math.min(secuencia.indiceActivo, secuencia.frames.length - 1);
+        aplicarFrameADocumento(doc, secuencia.frames[secuencia.indiceActivo]!);
+      }, 'Frame eliminado'),
+
+    irAFrame: (indice) =>
+      mutar((doc) => {
+        const secuencia = doc.secuencia;
+        if (!secuencia) return;
+        const destino = secuencia.frames[indice];
+        if (!destino) return;
+        // Se captura siempre, incluso al "ir" al frame en el que ya se está: es
+        // lo que recoge lo editado antes de reproducir. Sin esto, quien mueve
+        // un jugador y pulsa play directamente ve la jugada anterior.
+        capturarFrameActivo(doc);
+        if (indice === secuencia.indiceActivo) return;
+        secuencia.indiceActivo = indice;
+        aplicarFrameADocumento(doc, destino);
+      }, `Frame ${indice + 1}`),
+
+    renombrarFrame: (indice, nombre) =>
+      mutar((doc) => {
+        const frame = doc.secuencia?.frames[indice];
+        if (frame) frame.nombre = nombre.trim() || undefined;
+      }, 'Frame renombrado'),
 
     deshacer: () => {
       set((estado) => ({ historial: deshacerHistorial(estado.historial) }));

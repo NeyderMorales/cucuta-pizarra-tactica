@@ -3,6 +3,7 @@ import { Campo, type CampoHandle } from './components/campo/Campo';
 import { SelectorFormacion } from './components/campo/SelectorFormacion';
 import { BarraHerramientas } from './components/pizarra/BarraHerramientas';
 import { FlyoutObjetos } from './components/pizarra/FlyoutObjetos';
+import { TimelineTactica } from './components/pizarra/TimelineTactica';
 import { Boton } from './components/ui/Boton';
 import { Dropdown } from './components/ui/Dropdown';
 import { IndicadorAutoguardado } from './components/ui/IndicadorAutoguardado';
@@ -275,6 +276,8 @@ function MenuOpciones({
   onAbrirCancha,
   onAbrirActividad,
   onAbrirExportar,
+  onCrearJugada,
+  hayJugada,
 }: {
   onAbrirAlineaciones: () => void;
   onAbrirGestionPlantilla: () => void;
@@ -282,6 +285,8 @@ function MenuOpciones({
   onAbrirCancha: () => void;
   onAbrirActividad: () => void;
   onAbrirExportar: () => void;
+  onCrearJugada: () => void;
+  hayJugada: boolean;
 }) {
   const pantallaCompleta = useUiStore((s) => s.pantallaCompleta);
   const setPantallaCompleta = useUiStore((s) => s.setPantallaCompleta);
@@ -344,6 +349,16 @@ function MenuOpciones({
           >
             🏟️ Cancha
           </ItemMenu>
+          {!hayJugada && (
+            <ItemMenu
+              onClick={() => {
+                onCrearJugada();
+                cerrar();
+              }}
+            >
+              🎬 Crear jugada
+            </ItemMenu>
+          )}
           <ItemMenu
             onClick={() => {
               nuevaAlineacion();
@@ -412,6 +427,8 @@ export default function App() {
   const cargarDatosEditados = usePlantillaStore((s) => s.cargarDatosEditados);
   const sincronizarPersonalizados = usePlantillaStore((s) => s.sincronizarPersonalizados);
   const jugadoresPersonalizados = useAlineacionStore((s) => s.historial.presente.jugadoresPersonalizados);
+  const hayJugada = useAlineacionStore((s) => s.historial.presente.secuencia !== null);
+  const iniciarSecuencia = useAlineacionStore((s) => s.iniciarSecuencia);
 
   const modoObjetoActivo = usePizarraCampoStore((s) => s.modoObjetoActivo);
   const activarModoObjeto = usePizarraCampoStore((s) => s.activarModoObjeto);
@@ -480,10 +497,12 @@ export default function App() {
   if (cargando) return <PantallaCarga />;
 
   const barrasVisibles = !pantallaCompleta;
+  const timelineVisible = barrasVisibles && hayJugada;
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-club-negro text-white">
-      <main className="absolute inset-0 px-2 pb-[76px] pt-[68px] sm:px-4">
+      {/* Con la jugada abierta, el campo cede el alto de la timeline para no quedar tapado. */}
+      <main className={`absolute inset-0 px-2 pt-[68px] sm:px-4 ${timelineVisible ? 'pb-[184px]' : 'pb-[76px]'}`}>
         <Campo ref={campoRef} />
       </main>
 
@@ -505,6 +524,8 @@ export default function App() {
               onAbrirCancha={() => setModalCanchaAbierto(true)}
               onAbrirActividad={() => setPanelActividadAbierto(true)}
               onAbrirExportar={() => setModalExportarAbierto(true)}
+              onCrearJugada={iniciarSecuencia}
+              hayJugada={hayJugada}
             />
           </div>
         </header>
@@ -523,6 +544,12 @@ export default function App() {
           <div className="pointer-events-auto">
             <FlyoutObjetos onCerrar={desactivarModoObjeto} />
           </div>
+        </div>
+      )}
+
+      {timelineVisible && (
+        <div className="absolute inset-x-0 bottom-[68px] z-30">
+          <TimelineTactica />
         </div>
       )}
 

@@ -32,10 +32,12 @@ import { useAlineacionStore } from '../../store/alineacionStore';
 import { usePizarraStore } from '../../store/pizarraStore';
 import { usePizarraCampoStore } from '../../store/pizarraCampoStore';
 import { usePlantillaStore } from '../../store/plantillaStore';
+import { useReproduccionStore } from '../../store/reproduccionStore';
 import { useUiStore } from '../../store/uiStore';
 import { obtenerFormacion } from '../../data/formaciones';
 import type { ColorObjeto, Orientacion, Posicion, PuntoNormalizado, TipoObjeto, ZonaFormacion } from '../../types';
-import { ANCHO_CAMPO_M, COLORES_OBJETO, LARGO_CAMPO_M, OFFSET_BALON_ANCLADO } from '../../utils/constantes';
+import { ANCHO_CAMPO_M, COLORES_OBJETO, LARGO_CAMPO_M } from '../../utils/constantes';
+import { posicionEfectivaBalon } from '../../utils/balon';
 import { pixelesAPorcentaje, VENTANA_CAMPO_COMPLETO, type VentanaRecorte } from '../../utils/coordenadas';
 import { generarPuntosFila, generarPuntosRejilla, generarPuntosSlalom, ubicarZonaEnLado } from '../../utils/anexoA';
 import { LineasCampo } from './LineasCampo';
@@ -49,6 +51,8 @@ import { ModalNotaJugador } from '../jugador/ModalNotaJugador';
 import { CapaDibujo } from '../pizarra/CapaDibujo';
 import { DrawerPlantilla } from '../ui/DrawerPlantilla';
 import { CapaCuadricula } from './CapaCuadricula';
+import { CapaReproduccion } from './CapaReproduccion';
+import { CapaTrayectorias } from './CapaTrayectorias';
 import { IconoObjeto } from './IconoObjeto';
 import { ObjetoCampoDraggable, type DatosArrastreObjeto } from './ObjetoCampoDraggable';
 import { BalonDraggable, type DatosArrastreBalon } from './BalonDraggable';
@@ -78,7 +82,7 @@ export interface CampoHandle {
  * verificado comparando `droppableContainer.rect.current` (el valor que usa
  * `pointerWithin`) contra `nodo.getBoundingClientRect()` en el mismo instante:
  * cuando un jugador cambia de posición sin pasar por un arrastre (asignación
- * desde el selector, sustitución, "Cambiar por…") ese rect queda obsoleto y ya
+ * desde el selector, sustitución, "Cambiar por⬦") ese rect queda obsoleto y ya
  * no hay ningún evento de drag posterior que lo refresque a tiempo para el
  * primer soltado sobre él (p. ej. anclar el balón, FA2). Por eso el emparejamiento
  * con "slot-{id}" de aquí abajo NO usa `pointerWithin` (que confía en ese
@@ -401,8 +405,13 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
     return documento.titulares.some(cerca) || (documento.rival?.jugadores.some(cerca) ?? false);
   }, [documento.titulares, documento.rival]);
 
-  const rivalVisible = Boolean(documento.rival?.visible) && documento.rival?.modoVista !== 'solo_nosotros';
-  const propioVisible = documento.rival?.modoVista !== 'solo_rival';
+  // Durante la reproducción manda `CapaReproduccion`: las fichas interactivas se
+  // ocultan para que no se puedan arrastrar por accidente ni se dupliquen en pantalla.
+  const reproduciendo = useReproduccionStore((s) => s.reproduciendo);
+  const rivalVisible =
+    !reproduciendo && Boolean(documento.rival?.visible) && documento.rival?.modoVista !== 'solo_nosotros';
+  const propioVisible = !reproduciendo && documento.rival?.modoVista !== 'solo_rival';
+  const interaccionBloqueada = modoDibujoActivo || modoObjetoActivo || reproduciendo;
 
   function manejarClicColocacion(evento: ReactMouseEvent<HTMLDivElement>): void {
     const punto = escala.aPorcentaje(evento.clientX, evento.clientY);
@@ -481,10 +490,8 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
         return;
       }
       if (!dentroDelCampo) return;
-      const propietario = actual.jugadorPoseedorId ? documento.titulares.find((t) => t.jugadorId === actual.jugadorPoseedorId) : null;
-      const baseX = propietario ? propietario.x + OFFSET_BALON_ANCLADO.x : actual.x;
-      const baseY = propietario ? propietario.y + OFFSET_BALON_ANCLADO.y : actual.y;
-      const punto = posicionTrasArrastre(baseX, baseY);
+      const base = posicionEfectivaBalon(actual, documento.titulares);
+      const punto = posicionTrasArrastre(base.x, base.y);
       moverBalon(datos.balonId, punto.x, punto.y);
       return;
     }
@@ -548,7 +555,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
   // Derivados de `menu`: solo válidos mientras el menú contextual sigue abierto.
   // `MenuJugador` cierra el menú (setMenu(null)) en el mismo lote de React que
   // dispara la acción elegida, así que cualquier modal que la acción abra
-  // (Cambiar por…, Nota…, Marcar a…) ya vería `menu` en null en su primer
+  // (Cambiar por⬦, Nota⬦, Marcar a⬦) ya vería `menu` en null en su primer
   // render. Por eso esos flujos se derivan de su propio id, no de `menu`.
   const jugadorMenu = menu ? obtenerPorId(menu.jugadorId) : undefined;
   const tituarMenu = menu ? documento.titulares.find((t) => t.jugadorId === menu.jugadorId) : undefined;
@@ -606,7 +613,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
 
             {propioVisible &&
               zonasVacias.map((zona, indice) => (
-                <Zona key={zona.id} zona={zona} indice={indice} deshabilitada={modoDibujoActivo || modoObjetoActivo} onSeleccionar={() => setZonaActiva(zona)} />
+                <Zona key={zona.id} zona={zona} indice={indice} deshabilitada={interaccionBloqueada} onSeleccionar={() => setZonaActiva(zona)} />
               ))}
 
             {rivalVisible &&
@@ -615,17 +622,18 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
                   key={zona.id}
                   zona={zona}
                   indice={indice}
-                  deshabilitada={modoDibujoActivo || modoObjetoActivo}
+                  deshabilitada={interaccionBloqueada}
                   onSeleccionar={() => setZonaRivalActiva(zona)}
                 />
               ))}
 
-            {documento.objetos.map((objeto) => (
+            {!reproduciendo &&
+              documento.objetos.map((objeto) => (
               <ObjetoCampoDraggable
                 key={objeto.id}
                 objeto={objeto}
                 seleccionado={objetoSeleccionadoId === objeto.id}
-                deshabilitado={modoDibujoActivo || modoObjetoActivo}
+                deshabilitado={interaccionBloqueada}
                 onSeleccionar={() => setObjetoSeleccionadoId(objeto.id)}
                 onRotar={(rotacion) => rotarObjeto(objeto.id, rotacion)}
                 onDuplicar={() => duplicarObjeto(objeto.id)}
@@ -646,10 +654,10 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
               );
             })}
 
-            {documento.balones.map((balon) => {
+            {!reproduciendo &&
+              documento.balones.map((balon) => {
               const propietario = balon.jugadorPoseedorId ? documento.titulares.find((t) => t.jugadorId === balon.jugadorPoseedorId) : undefined;
-              const xPct = propietario ? Math.min(100, propietario.x + OFFSET_BALON_ANCLADO.x) : balon.x;
-              const yPct = propietario ? Math.min(100, propietario.y + OFFSET_BALON_ANCLADO.y) : balon.y;
+              const { x: xPct, y: yPct } = posicionEfectivaBalon(balon, documento.titulares);
               const deltaExterno =
                 propietario && arrastreJugadorActivo?.jugadorId === propietario.jugadorId ? arrastreJugadorActivo.delta : undefined;
               return (
@@ -659,7 +667,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
                   xPct={xPct}
                   yPct={yPct}
                   deltaExterno={deltaExterno}
-                  deshabilitado={modoDibujoActivo || modoObjetoActivo}
+                  deshabilitado={interaccionBloqueada}
                   onDevolverCentro={() => devolverBalonCentro(balon.id)}
                   onLiberar={() => liberarBalon(balon.id)}
                   onMenuContextual={(x, y) => setMenuBalon({ balonId: balon.id, x, y })}
@@ -667,7 +675,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
               );
             })}
 
-            {documento.rival && (
+            {documento.rival && !reproduciendo && (
               <CapaMarcajes
                 marcajes={documento.marcajes}
                 titulares={documento.titulares}
@@ -683,7 +691,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
                   jugador={jugadorRival}
                   paleta={documento.rival!.paleta}
                   atenuado={documento.titulares.some((t) => Math.abs(t.x - jugadorRival.x) < 3 && Math.abs(t.y - jugadorRival.y) < 3)}
-                  deshabilitado={modoDibujoActivo || modoObjetoActivo}
+                  deshabilitado={interaccionBloqueada}
                   onMenuContextual={(jugadorRivalId, x, y) => setMenuRival({ jugadorRivalId, x, y })}
                 />
               ))}
@@ -703,11 +711,15 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
                     nota={titular.nota}
                     tamano={enModoAmbos ? 'compacto' : 'md'}
                     esSlotDestino
-                    deshabilitado={modoDibujoActivo || modoObjetoActivo}
-                    onMenuContextual={modoDibujoActivo || modoObjetoActivo ? undefined : (id, x, y) => setMenu({ jugadorId: id, x, y })}
+                    deshabilitado={interaccionBloqueada}
+                    onMenuContextual={interaccionBloqueada ? undefined : (id, x, y) => setMenu({ jugadorId: id, x, y })}
                   />
                 );
               })}
+
+            <CapaTrayectorias />
+
+            {reproduciendo && <CapaReproduccion />}
 
             <CapaDibujo ref={canvasRef} />
           </ZonaCampoDroppable>
@@ -719,15 +731,15 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
               onCerrar={() => setMenu(null)}
               acciones={[
                 { etiqueta: 'Quitar del campo', onSeleccionar: () => quitarDelCampo(menu.jugadorId), peligro: true },
-                { etiqueta: 'Cambiar por…', onSeleccionar: () => setCambioParaId(menu.jugadorId) },
+                { etiqueta: 'Cambiar por⬦', onSeleccionar: () => setCambioParaId(menu.jugadorId) },
                 { etiqueta: 'Enviar al banquillo', onSeleccionar: () => enviarABanquillo(menu.jugadorId) },
                 {
                   etiqueta: tituarMenu?.esCapitan ? 'Quitar brazalete de capitán' : 'Nombrar capitán',
                   onSeleccionar: () => toggleCapitan(menu.jugadorId),
                 },
-                { etiqueta: tituarMenu?.nota ? 'Editar nota…' : 'Añadir nota…', onSeleccionar: () => setNotaParaId(menu.jugadorId) },
+                { etiqueta: tituarMenu?.nota ? 'Editar nota⬦' : 'Añadir nota⬦', onSeleccionar: () => setNotaParaId(menu.jugadorId) },
                 ...(documento.rival && documento.rival.jugadores.length > 0
-                  ? [{ etiqueta: 'Marcar a…', onSeleccionar: () => setMarcandoDesdeId(menu.jugadorId) }]
+                  ? [{ etiqueta: 'Marcar a⬦', onSeleccionar: () => setMarcandoDesdeId(menu.jugadorId) }]
                   : []),
               ]}
             />
@@ -791,7 +803,7 @@ export const Campo = forwardRef<CampoHandle>(function Campo(_props, ref) {
 
           <SelectorJugador
             abierto={cambioParaId !== null}
-            titulo="Cambiar por…"
+            titulo="Cambiar por⬦"
             posicionSugerida={zonaOrigenCambio?.posicion ?? jugadorCambio?.posicionNatural ?? null}
             onCerrar={() => setCambioParaId(null)}
             onSeleccionarJugador={(entranteId) => {

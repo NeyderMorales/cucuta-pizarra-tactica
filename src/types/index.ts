@@ -158,6 +158,31 @@ export interface IdentidadCancha {
   rotado180: boolean;
 }
 
+// --- Jugadas animadas: secuencia de frames tácticos ---
+
+/**
+ * Instantánea de lo que se mueve durante una jugada. Guarda solo eso, no el
+ * tablero entero: la formación, el tema de cancha, la configuración de la
+ * cuadrícula o los datos del rival no cambian entre frames y siguen viviendo
+ * una sola vez en el documento.
+ */
+export interface FrameTactico {
+  id: string;
+  nombre?: string;
+  titulares: JugadorEnCampo[];
+  jugadoresRival: JugadorRival[];
+  balones: Balon[];
+  objetos: ObjetoCampo[];
+  trazos: Trazo[];
+  celdasPintadas: Record<string, ColorCelda>;
+}
+
+export interface SecuenciaTactica {
+  frames: FrameTactico[];
+  /** Frame que se está editando; es el que el campo muestra en modo edición. */
+  indiceActivo: number;
+}
+
 export interface Alineacion {
   id: string;
   nombre: string;
@@ -176,6 +201,8 @@ export interface Alineacion {
   cancha: IdentidadCancha;
   /** Jugadores creados a mano que no están en la plantilla; viajan con la alineación. */
   jugadoresPersonalizados?: Jugador[];
+  /** `null` mientras el tablero sea una pizarra fija: solo existe al crear una jugada. */
+  secuencia?: SecuenciaTactica | null;
 }
 
 export type Orientacion = 'vertical' | 'horizontal';
